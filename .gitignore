@@ -1,0 +1,26 @@
+# Environment
+.env
+*.env.local
+
+# Go
+backend/vendor/
+backend/*.exe
+backend/audit-dashboard
+
+# Node
+frontend/node_modules/
+frontend/dist/
+frontend/.cache/
+
+# Docker volumes
+postgres_data/
+uploads/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
