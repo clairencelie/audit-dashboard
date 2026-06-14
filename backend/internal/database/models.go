@@ -220,6 +220,20 @@ type Notification struct {
 	IsRead     bool       `gorm:"default:false" json:"is_read"`
 }
 
+// --- AI Log ---
+
+type AILog struct {
+	Base
+	UserID       uuid.UUID  `gorm:"type:uuid;not null" json:"user_id"`
+	User         User       `gorm:"foreignKey:UserID" json:"user"`
+	ProjectID    *uuid.UUID `gorm:"type:uuid" json:"project_id"`
+	ModelUsed    string     `json:"model_used"`
+	Prompt       string     `gorm:"type:text" json:"prompt"`
+	Response     string     `gorm:"type:text" json:"response"`
+	Status       string     `gorm:"default:'success'" json:"status"`
+	ErrorMessage string     `json:"error_message"`
+}
+
 // --- Audit Trail ---
 
 type AuditTrail struct {

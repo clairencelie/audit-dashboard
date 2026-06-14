@@ -7,6 +7,7 @@ import (
 	"github.com/clairencelie/audit-dashboard/backend/pkg/response"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 )
 
 func GetByProject(c *gin.Context) {
@@ -52,39 +53,30 @@ func Create(c *gin.Context) {
 	userIDStr, _ := c.Get("user_id")
 	userID, _ := uuid.Parse(userIDStr.(string))
 
+	type checklistInput struct {
+		Title            string `json:"title"`
+		Objective        string `json:"objective"`
+		ProcedureText    string `json:"procedure_text"`
+		RequiredData     string `json:"required_data"`
+		ExpectedEvidence string `json:"expected_evidence"`
+		IsMandatory      *bool  `json:"is_mandatory"`
+		SourceCriteria   string `json:"source_criteria"`
+	}
 	var req struct {
-		AuditPeriodStart string `json:"audit_period_start"`
-		AuditPeriodEnd   string `json:"audit_period_end"`
-		DataPeriodStart  string `json:"data_period_start"`
-		DataPeriodEnd    string `json:"data_period_end"`
-		Scope            string `json:"scope"`
-		Objectives       string `json:"objectives"`
-		CriteriaSummary  string `json:"criteria_summary"`
-		RiskAnalysis     string `json:"risk_analysis"`
-		DataRequired     string `json:"data_required"`
+		AuditPeriodStart string           `json:"audit_period_start"`
+		AuditPeriodEnd   string           `json:"audit_period_end"`
+		DataPeriodStart  string           `json:"data_period_start"`
+		DataPeriodEnd    string           `json:"data_period_end"`
+		Scope            string           `json:"scope"`
+		Objectives       string           `json:"objectives"`
+		CriteriaSummary  string           `json:"criteria_summary"`
+		RiskAnalysis     string           `json:"risk_analysis"`
+		DataRequired     string           `json:"data_required"`
+		Checklists       []checklistInput `json:"checklists"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, err.Error())
 		return
-	}
-
-	// Get latest version
-	var lastProgram database.AuditProgram
-	var version = 1
-	if err := database.DB.Where("audit_project_id = ?", projectID).Order("version DESC").First(&lastProgram).Error; err == nil {
-		version = lastProgram.Version + 1
-	}
-
-	program := database.AuditProgram{
-		AuditProjectID:  projectID,
-		Version:         version,
-		Scope:           req.Scope,
-		Objectives:      req.Objectives,
-		CriteriaSummary: req.CriteriaSummary,
-		RiskAnalysis:    req.RiskAnalysis,
-		DataRequired:    req.DataRequired,
-		Status:          "draft",
-		CreatedByID:     userID,
 	}
 
 	parseDate := func(s string) *time.Time {
@@ -95,16 +87,64 @@ func Create(c *gin.Context) {
 		return &t
 	}
 
-	program.AuditPeriodStart = parseDate(req.AuditPeriodStart)
-	program.AuditPeriodEnd = parseDate(req.AuditPeriodEnd)
-	program.DataPeriodStart = parseDate(req.DataPeriodStart)
-	program.DataPeriodEnd = parseDate(req.DataPeriodEnd)
+	// Get latest version
+	var lastProgram database.AuditProgram
+	var version = 1
+	if err := database.DB.Where("audit_project_id = ?", projectID).Order("version DESC").First(&lastProgram).Error; err == nil {
+		version = lastProgram.Version + 1
+	}
 
-	if err := database.DB.Create(&program).Error; err != nil {
+	program := database.AuditProgram{
+		AuditProjectID:   projectID,
+		Version:          version,
+		Scope:            req.Scope,
+		Objectives:       req.Objectives,
+		CriteriaSummary:  req.CriteriaSummary,
+		RiskAnalysis:     req.RiskAnalysis,
+		DataRequired:     req.DataRequired,
+		Status:           "draft",
+		CreatedByID:      userID,
+		AuditPeriodStart: parseDate(req.AuditPeriodStart),
+		AuditPeriodEnd:   parseDate(req.AuditPeriodEnd),
+		DataPeriodStart:  parseDate(req.DataPeriodStart),
+		DataPeriodEnd:    parseDate(req.DataPeriodEnd),
+	}
+
+	err = database.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(&program).Error; err != nil {
+			return err
+		}
+		for i, cl := range req.Checklists {
+			if cl.Title == "" {
+				continue
+			}
+			isMandatory := true
+			if cl.IsMandatory != nil {
+				isMandatory = *cl.IsMandatory
+			}
+			checklist := database.AuditChecklist{
+				AuditProgramID:   program.ID,
+				Title:            cl.Title,
+				Objective:        cl.Objective,
+				ProcedureText:    cl.ProcedureText,
+				RequiredData:     cl.RequiredData,
+				ExpectedEvidence: cl.ExpectedEvidence,
+				IsMandatory:      isMandatory,
+				SourceCriteria:   cl.SourceCriteria,
+				SequenceNo:       i + 1,
+			}
+			if err := tx.Create(&checklist).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if err != nil {
 		response.InternalError(c, "Failed to create audit program")
 		return
 	}
 
+	database.DB.Preload("CreatedBy").Preload("Checklists").First(&program, "id = ?", program.ID)
 	response.Created(c, "Audit program created", program)
 }
 

@@ -9,8 +9,8 @@ import { Modal } from '@/components/ui/Modal'
 import { auditProgramsService } from '@/services/auditPrograms'
 import { useAuthStore } from '@/stores/authStore'
 import { formatDate, formatDateTime } from '@/lib/utils'
-import { PROGRAM_STATUS_LABELS } from '@/types'
-import type { AuditProgram, AuditChecklist } from '@/types'
+import { PROGRAM_STATUS_LABELS, GEMINI_MODELS } from '@/types'
+import type { AuditProgram, AuditChecklist, AIGeneratedProgram, AIChecklist } from '@/types'
 import {
   Plus,
   FileText,
@@ -21,10 +21,20 @@ import {
   Trash2,
   ChevronDown,
   ChevronUp,
+  Sparkles,
+  X,
 } from 'lucide-react'
 
 interface Props {
-  project: { id: string; status: string; spv_id: string }
+  project: {
+    id: string
+    status: string
+    spv_id: string
+    audit_theme?: string
+    auditee?: { name: string }
+    planned_start_date?: string
+    planned_end_date?: string
+  }
 }
 
 export function AuditProgramTab({ project }: Props) {
@@ -45,7 +55,6 @@ export function AuditProgramTab({ project }: Props) {
   })
 
   const programs = data?.data ?? []
-  const latestProgram = programs[0]
 
   const submitMutation = useMutation({
     mutationFn: (id: string) => auditProgramsService.submit(id),
@@ -154,9 +163,23 @@ export function AuditProgramTab({ project }: Props) {
                 </p>
               </div>
               <div>
+                <p className="text-gray-500 mb-0.5">Periode Data Pemeriksaan</p>
+                <p className="font-medium text-gray-800">
+                  {program.data_period_start
+                    ? `${formatDate(program.data_period_start)} – ${formatDate(program.data_period_end)}`
+                    : '—'}
+                </p>
+              </div>
+              <div>
                 <p className="text-gray-500 mb-0.5">Dibuat oleh</p>
                 <p className="font-medium text-gray-800">{program.created_by?.name}</p>
               </div>
+              {program.submitted_at && (
+                <div>
+                  <p className="text-gray-500 mb-0.5">Submitted</p>
+                  <p className="font-medium text-gray-800">{formatDateTime(program.submitted_at)}</p>
+                </div>
+              )}
             </div>
 
             {program.scope && (
@@ -170,6 +193,13 @@ export function AuditProgramTab({ project }: Props) {
               <div className="mb-3">
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Tujuan</p>
                 <p className="text-sm text-gray-700 whitespace-pre-wrap">{program.objectives}</p>
+              </div>
+            )}
+
+            {program.risk_analysis && (
+              <div className="mb-3">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Analisis Risiko</p>
+                <p className="text-sm text-gray-700 whitespace-pre-wrap">{program.risk_analysis}</p>
               </div>
             )}
 
@@ -228,10 +258,6 @@ export function AuditProgramTab({ project }: Props) {
         ))
       )}
 
-      {canCreate && programs.length === 0 && (
-        <div /> // already shown above
-      )}
-
       {canCreate && programs.length > 0 && programs[0].status === 'need_revision' && (
         <Card className="border-orange-200 bg-orange-50">
           <div className="flex items-center gap-3">
@@ -247,7 +273,7 @@ export function AuditProgramTab({ project }: Props) {
       {/* Create Program Modal */}
       {showCreate && (
         <CreateProgramModal
-          projectId={project.id}
+          project={project}
           onClose={() => setShowCreate(false)}
           onSuccess={() => {
             setShowCreate(false)
@@ -383,16 +409,132 @@ function ChecklistItem({
   )
 }
 
+// --- Inline checklist row for CreateProgramModal ---
+
+interface ChecklistRow {
+  title: string
+  objective: string
+  procedure_text: string
+  required_data: string
+  expected_evidence: string
+  is_mandatory: boolean
+  source_criteria: string
+}
+
+function emptyChecklist(): ChecklistRow {
+  return {
+    title: '',
+    objective: '',
+    procedure_text: '',
+    required_data: '',
+    expected_evidence: '',
+    is_mandatory: true,
+    source_criteria: '',
+  }
+}
+
+function ChecklistRowEditor({
+  row,
+  index,
+  onChange,
+  onRemove,
+}: {
+  row: ChecklistRow
+  index: number
+  onChange: (row: ChecklistRow) => void
+  onRemove: () => void
+}) {
+  const [expanded, setExpanded] = useState(true)
+
+  return (
+    <div className="border border-gray-200 rounded-lg overflow-hidden">
+      <div
+        className="flex items-center gap-3 p-3 bg-gray-50 cursor-pointer"
+        onClick={() => setExpanded(!expanded)}
+      >
+        <span className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center text-xs font-bold text-blue-700 shrink-0">
+          {index}
+        </span>
+        <input
+          className="flex-1 text-sm font-medium bg-transparent border-none outline-none placeholder-gray-400"
+          placeholder="Judul checklist (wajib diisi)..."
+          value={row.title}
+          onChange={(e) => onChange({ ...row, title: e.target.value })}
+          onClick={(e) => e.stopPropagation()}
+        />
+        <div className="flex items-center gap-2 shrink-0">
+          <select
+            className="text-xs border border-gray-300 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            value={row.is_mandatory ? 'true' : 'false'}
+            onChange={(e) => onChange({ ...row, is_mandatory: e.target.value === 'true' })}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <option value="true">Wajib</option>
+            <option value="false">Tambahan</option>
+          </select>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              onRemove()
+            }}
+            className="p-1 text-gray-300 hover:text-red-500 transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
+          {expanded ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
+        </div>
+      </div>
+      {expanded && (
+        <div className="p-3 space-y-2 border-t border-gray-100">
+          <Textarea
+            label="Tujuan"
+            rows={2}
+            value={row.objective}
+            onChange={(e) => onChange({ ...row, objective: e.target.value })}
+          />
+          <Textarea
+            label="Prosedur Audit"
+            rows={2}
+            value={row.procedure_text}
+            onChange={(e) => onChange({ ...row, procedure_text: e.target.value })}
+          />
+          <div className="grid grid-cols-2 gap-2">
+            <Input
+              label="Data Diperlukan"
+              value={row.required_data}
+              onChange={(e) => onChange({ ...row, required_data: e.target.value })}
+            />
+            <Input
+              label="Expected Evidence"
+              value={row.expected_evidence}
+              onChange={(e) => onChange({ ...row, expected_evidence: e.target.value })}
+            />
+          </div>
+          <Input
+            label="Sumber Kriteria"
+            placeholder="cth. SOP-001, POJK 12/2021"
+            value={row.source_criteria}
+            onChange={(e) => onChange({ ...row, source_criteria: e.target.value })}
+          />
+        </div>
+      )}
+    </div>
+  )
+}
+
+// --- CreateProgramModal ---
+
 function CreateProgramModal({
-  projectId,
+  project,
   onClose,
   onSuccess,
 }: {
-  projectId: string
+  project: Props['project']
   onClose: () => void
   onSuccess: () => void
 }) {
-  const { register, handleSubmit } = useForm<{
+  const { register, handleSubmit, setValue, watch } = useForm<{
     scope: string
     objectives: string
     criteria_summary: string
@@ -400,36 +542,474 @@ function CreateProgramModal({
     data_required: string
     audit_period_start: string
     audit_period_end: string
+    data_period_start: string
+    data_period_end: string
   }>()
 
+  const [checklists, setChecklists] = useState<ChecklistRow[]>([])
+  const [showAIAssist, setShowAIAssist] = useState(false)
+
   const mutation = useMutation({
-    mutationFn: (data: Record<string, string>) => auditProgramsService.create(projectId, data),
+    mutationFn: (data: Record<string, unknown>) =>
+      auditProgramsService.create(project.id, data as Parameters<typeof auditProgramsService.create>[1]),
     onSuccess,
   })
 
-  return (
-    <Modal open onClose={onClose} title="Buat Audit Program" size="xl">
-      <form onSubmit={handleSubmit((d) => mutation.mutate(d))} className="space-y-4">
-        <div className="grid grid-cols-2 gap-4">
-          <Input label="Periode Audit Mulai" type="date" {...register('audit_period_start')} />
-          <Input label="Periode Audit Selesai" type="date" {...register('audit_period_end')} />
-        </div>
-        <Textarea label="Lingkup Pemeriksaan" rows={3} {...register('scope')} />
-        <Textarea label="Tujuan Pemeriksaan" rows={3} {...register('objectives')} />
-        <Textarea label="Kriteria Pemeriksaan" rows={2} {...register('criteria_summary')} />
-        <Textarea label="Analisis Risiko" rows={3} {...register('risk_analysis')} />
-        <Textarea label="Data yang Diperlukan" rows={2} {...register('data_required')} />
+  const handleSubmitForm = handleSubmit((d) => {
+    mutation.mutate({ ...d, checklists })
+  })
 
-        <div className="flex justify-end gap-3 pt-2">
-          <Button variant="outline" type="button" onClick={onClose}>
-            Batal
-          </Button>
-          <Button type="submit" loading={mutation.isPending}>
-            Simpan Draft
-          </Button>
+  const applyAIDraft = (draft: AIGeneratedProgram) => {
+    setValue('objectives', draft.objectives)
+    setValue('scope', draft.scope)
+    setValue('risk_analysis', draft.risk_analysis)
+    setValue('data_required', draft.data_required)
+    setValue('criteria_summary', draft.criteria_summary)
+    setChecklists(
+      draft.checklists.map((cl) => ({
+        title: cl.title,
+        objective: cl.objective,
+        procedure_text: cl.procedure_text,
+        required_data: cl.required_data,
+        expected_evidence: cl.expected_evidence,
+        is_mandatory: cl.is_mandatory,
+        source_criteria: cl.source_criteria,
+      }))
+    )
+    setShowAIAssist(false)
+  }
+
+  return (
+    <>
+      <Modal open onClose={onClose} title="Buat Audit Program" size="xl">
+        <form onSubmit={handleSubmitForm} className="space-y-4">
+          {/* AI Assist banner */}
+          <div className="flex items-center justify-between p-3 bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg border border-purple-200">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-purple-600" />
+              <span className="text-sm text-purple-800 font-medium">AI Assist tersedia</span>
+              <span className="text-xs text-purple-600">— Generate draft program + checklist dengan Gemini</span>
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => setShowAIAssist(true)}
+            >
+              <Sparkles className="w-4 h-4 text-purple-600" />
+              AI Assist
+            </Button>
+          </div>
+
+          {/* Periode fields */}
+          <div className="grid grid-cols-2 gap-4">
+            <Input label="Periode Audit Mulai" type="date" {...register('audit_period_start')} />
+            <Input label="Periode Audit Selesai" type="date" {...register('audit_period_end')} />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <Input label="Periode Data Pemeriksaan Mulai" type="date" {...register('data_period_start')} />
+            <Input label="Periode Data Pemeriksaan Selesai" type="date" {...register('data_period_end')} />
+          </div>
+
+          <Textarea label="Lingkup Pemeriksaan" rows={3} {...register('scope')} />
+          <Textarea label="Tujuan Pemeriksaan" rows={3} {...register('objectives')} />
+          <Textarea label="Kriteria Pemeriksaan" rows={2} {...register('criteria_summary')} />
+          <Textarea label="Analisis Risiko" rows={3} {...register('risk_analysis')} />
+          <Textarea label="Data yang Diperlukan" rows={2} {...register('data_required')} />
+
+          {/* Checklists inline */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-sm font-medium text-gray-700">
+                Checklist Pemeriksaan ({checklists.length})
+              </p>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                onClick={() => setChecklists([...checklists, emptyChecklist()])}
+              >
+                <Plus className="w-4 h-4" />
+                Tambah Checklist
+              </Button>
+            </div>
+            {checklists.length === 0 ? (
+              <div className="text-center py-6 border-2 border-dashed border-gray-200 rounded-lg">
+                <p className="text-sm text-gray-400">Belum ada checklist. Tambah manual atau gunakan AI Assist.</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {checklists.map((cl, i) => (
+                  <ChecklistRowEditor
+                    key={i}
+                    row={cl}
+                    index={i + 1}
+                    onChange={(updated) => {
+                      const next = [...checklists]
+                      next[i] = updated
+                      setChecklists(next)
+                    }}
+                    onRemove={() => setChecklists(checklists.filter((_, idx) => idx !== i))}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="flex justify-end gap-3 pt-2">
+            <Button variant="outline" type="button" onClick={onClose}>
+              Batal
+            </Button>
+            <Button type="submit" loading={mutation.isPending}>
+              Simpan Draft
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      {showAIAssist && (
+        <AIAssistModal
+          project={project}
+          onClose={() => setShowAIAssist(false)}
+          onApply={applyAIDraft}
+        />
+      )}
+    </>
+  )
+}
+
+// --- AI Assist Modal ---
+
+function AIAssistModal({
+  project,
+  onClose,
+  onApply,
+}: {
+  project: Props['project']
+  onClose: () => void
+  onApply: (draft: AIGeneratedProgram) => void
+}) {
+  const [step, setStep] = useState<'input' | 'result'>('input')
+  const [scope, setScope] = useState('')
+  const [areas, setAreas] = useState('')
+  const [criteria, setCriteria] = useState('')
+  const [risks, setRisks] = useState('')
+  const [model, setModel] = useState(GEMINI_MODELS[0].value)
+  const [draft, setDraft] = useState<AIGeneratedProgram | null>(null)
+  const [editedDraft, setEditedDraft] = useState<AIGeneratedProgram | null>(null)
+  const [error, setError] = useState('')
+
+  const generateMutation = useMutation({
+    mutationFn: () =>
+      auditProgramsService.generateWithAI({
+        scope,
+        areas,
+        auditee: project.auditee?.name,
+        theme: project.audit_theme,
+        period:
+          project.planned_start_date && project.planned_end_date
+            ? `${project.planned_start_date} s/d ${project.planned_end_date}`
+            : undefined,
+        criteria: criteria || undefined,
+        risks: risks || undefined,
+        model,
+        project_id: project.id,
+      }),
+    onSuccess: (res) => {
+      if (res.data) {
+        setDraft(res.data)
+        setEditedDraft(JSON.parse(JSON.stringify(res.data)))
+        setStep('result')
+        setError('')
+      }
+    },
+    onError: (err: unknown) => {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+      setError(msg ?? 'Gagal generate. Coba lagi.')
+    },
+  })
+
+  const updateChecklist = (i: number, updated: AIChecklist) => {
+    if (!editedDraft) return
+    const cls = [...editedDraft.checklists]
+    cls[i] = updated
+    setEditedDraft({ ...editedDraft, checklists: cls })
+  }
+
+  const removeChecklist = (i: number) => {
+    if (!editedDraft) return
+    setEditedDraft({
+      ...editedDraft,
+      checklists: editedDraft.checklists.filter((_, idx) => idx !== i),
+    })
+  }
+
+  return (
+    <Modal open onClose={onClose} title="AI Assist — Generate Audit Program" size="xl">
+      {step === 'input' ? (
+        <div className="space-y-4">
+          <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-xs text-yellow-800">
+            AI akan generate draft Audit Program + Checklist. Auditor wajib review & edit sebelum disimpan.
+          </div>
+
+          <Textarea
+            label="Scope Pemeriksaan"
+            required
+            rows={3}
+            placeholder="cth. Pemeriksaan atas pengelolaan klaim asuransi jiwa Q1 2025..."
+            value={scope}
+            onChange={(e) => setScope(e.target.value)}
+          />
+          <Textarea
+            label="Area/Bagian yang Dicakup"
+            required
+            rows={2}
+            placeholder="cth. Proses penerimaan klaim, verifikasi dokumen, pembayaran klaim, pelaporan..."
+            value={areas}
+            onChange={(e) => setAreas(e.target.value)}
+          />
+          <Input
+            label="Kriteria/Regulasi Terkait (opsional)"
+            placeholder="cth. POJK 69/2016, SOP-KLA-001, SEOJK 5/2022"
+            value={criteria}
+            onChange={(e) => setCriteria(e.target.value)}
+          />
+          <Input
+            label="Risiko Utama (opsional)"
+            placeholder="cth. Fraud klaim, keterlambatan pembayaran, ketidaksesuaian dokumen"
+            value={risks}
+            onChange={(e) => setRisks(e.target.value)}
+          />
+
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-medium text-gray-700">Model Gemini</label>
+            <select
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              value={model}
+              onChange={(e) => setModel(e.target.value)}
+            >
+              {GEMINI_MODELS.map((m) => (
+                <option key={m.value} value={m.value}>
+                  {m.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {error && <p className="text-sm text-red-600">{error}</p>}
+
+          <div className="flex justify-end gap-3 pt-2">
+            <Button variant="outline" type="button" onClick={onClose}>
+              Batal
+            </Button>
+            <Button
+              type="button"
+              loading={generateMutation.isPending}
+              disabled={!scope.trim() || !areas.trim()}
+              onClick={() => generateMutation.mutate()}
+            >
+              <Sparkles className="w-4 h-4" />
+              {generateMutation.isPending ? 'Generating...' : 'Generate Draft'}
+            </Button>
+          </div>
         </div>
-      </form>
+      ) : (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <CheckCircle className="w-4 h-4 text-green-500" />
+              <span className="text-sm font-medium text-green-700">Draft berhasil di-generate. Review & edit sebelum Apply.</span>
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={() => { setStep('input'); setDraft(null) }}
+            >
+              Regenerate
+            </Button>
+          </div>
+
+          {editedDraft && (
+            <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
+              <Textarea
+                label="Tujuan Pemeriksaan"
+                rows={3}
+                value={editedDraft.objectives}
+                onChange={(e) => setEditedDraft({ ...editedDraft, objectives: e.target.value })}
+              />
+              <Textarea
+                label="Lingkup"
+                rows={2}
+                value={editedDraft.scope}
+                onChange={(e) => setEditedDraft({ ...editedDraft, scope: e.target.value })}
+              />
+              <Textarea
+                label="Analisis Risiko"
+                rows={3}
+                value={editedDraft.risk_analysis}
+                onChange={(e) => setEditedDraft({ ...editedDraft, risk_analysis: e.target.value })}
+              />
+              <Textarea
+                label="Data Diperlukan"
+                rows={2}
+                value={editedDraft.data_required}
+                onChange={(e) => setEditedDraft({ ...editedDraft, data_required: e.target.value })}
+              />
+              <Textarea
+                label="Kriteria Pemeriksaan"
+                rows={2}
+                value={editedDraft.criteria_summary}
+                onChange={(e) => setEditedDraft({ ...editedDraft, criteria_summary: e.target.value })}
+              />
+
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-sm font-medium text-gray-700">
+                    Checklist ({editedDraft.checklists.length})
+                  </p>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() =>
+                      setEditedDraft({
+                        ...editedDraft,
+                        checklists: [
+                          ...editedDraft.checklists,
+                          {
+                            title: '',
+                            objective: '',
+                            procedure_text: '',
+                            required_data: '',
+                            expected_evidence: '',
+                            is_mandatory: true,
+                            source_criteria: '',
+                          },
+                        ],
+                      })
+                    }
+                  >
+                    <Plus className="w-4 h-4" />
+                    Tambah
+                  </Button>
+                </div>
+                <div className="space-y-2">
+                  {editedDraft.checklists.map((cl, i) => (
+                    <AIChecklistEditor
+                      key={i}
+                      checklist={cl}
+                      index={i + 1}
+                      onChange={(updated) => updateChecklist(i, updated)}
+                      onRemove={() => removeChecklist(i)}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="flex justify-end gap-3 pt-2 border-t border-gray-100">
+            <Button variant="outline" type="button" onClick={onClose}>
+              Batal
+            </Button>
+            <Button
+              type="button"
+              onClick={() => editedDraft && onApply(editedDraft)}
+              disabled={!editedDraft}
+            >
+              <CheckCircle className="w-4 h-4" />
+              Apply Draft ke Form
+            </Button>
+          </div>
+        </div>
+      )}
     </Modal>
+  )
+}
+
+function AIChecklistEditor({
+  checklist,
+  index,
+  onChange,
+  onRemove,
+}: {
+  checklist: AIChecklist
+  index: number
+  onChange: (cl: AIChecklist) => void
+  onRemove: () => void
+}) {
+  const [expanded, setExpanded] = useState(false)
+
+  return (
+    <div className="border border-gray-200 rounded-lg overflow-hidden">
+      <div
+        className="flex items-center gap-3 p-3 bg-gray-50 cursor-pointer"
+        onClick={() => setExpanded(!expanded)}
+      >
+        <span className="w-6 h-6 bg-purple-100 rounded-full flex items-center justify-center text-xs font-bold text-purple-700 shrink-0">
+          {index}
+        </span>
+        <input
+          className="flex-1 text-sm font-medium bg-transparent border-none outline-none"
+          value={checklist.title}
+          onChange={(e) => onChange({ ...checklist, title: e.target.value })}
+          onClick={(e) => e.stopPropagation()}
+        />
+        <div className="flex items-center gap-1 shrink-0">
+          <select
+            className="text-xs border border-gray-300 rounded px-1.5 py-0.5"
+            value={checklist.is_mandatory ? 'true' : 'false'}
+            onChange={(e) => onChange({ ...checklist, is_mandatory: e.target.value === 'true' })}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <option value="true">Wajib</option>
+            <option value="false">Tambahan</option>
+          </select>
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onRemove() }}
+            className="p-1 text-gray-300 hover:text-red-500"
+          >
+            <X className="w-4 h-4" />
+          </button>
+          {expanded ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
+        </div>
+      </div>
+      {expanded && (
+        <div className="p-3 space-y-2 border-t border-gray-100 text-sm">
+          <Textarea
+            label="Tujuan"
+            rows={2}
+            value={checklist.objective}
+            onChange={(e) => onChange({ ...checklist, objective: e.target.value })}
+          />
+          <Textarea
+            label="Prosedur"
+            rows={2}
+            value={checklist.procedure_text}
+            onChange={(e) => onChange({ ...checklist, procedure_text: e.target.value })}
+          />
+          <div className="grid grid-cols-2 gap-2">
+            <Input
+              label="Data Diperlukan"
+              value={checklist.required_data}
+              onChange={(e) => onChange({ ...checklist, required_data: e.target.value })}
+            />
+            <Input
+              label="Expected Evidence"
+              value={checklist.expected_evidence}
+              onChange={(e) => onChange({ ...checklist, expected_evidence: e.target.value })}
+            />
+          </div>
+          <Input
+            label="Sumber Kriteria"
+            value={checklist.source_criteria}
+            onChange={(e) => onChange({ ...checklist, source_criteria: e.target.value })}
+          />
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -469,7 +1049,10 @@ function AddChecklistModal({
         <Input label="Judul Checklist" required {...register('title')} />
         <div className="flex flex-col gap-1">
           <label className="text-sm font-medium text-gray-700">Jenis</label>
-          <select className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" {...register('is_mandatory')}>
+          <select
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            {...register('is_mandatory')}
+          >
             <option value="true">Wajib (Mandatory)</option>
             <option value="false">Tambahan (Additional)</option>
           </select>

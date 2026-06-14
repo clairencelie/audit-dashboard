@@ -1,5 +1,5 @@
 import api from '@/lib/axios'
-import type { AuditProgram, AuditChecklist, ApiResponse } from '@/types'
+import type { AuditProgram, AuditChecklist, ApiResponse, AIGeneratedProgram } from '@/types'
 
 export const auditProgramsService = {
   getByProject: async (projectId: string) => {
@@ -55,6 +55,21 @@ export const auditProgramsService = {
 
   deleteChecklist: async (id: string) => {
     const response = await api.delete(`/checklists/${id}`)
+    return response.data
+  },
+
+  generateWithAI: async (data: {
+    scope: string
+    areas: string
+    auditee?: string
+    theme?: string
+    period?: string
+    criteria?: string
+    risks?: string
+    model?: string
+    project_id?: string
+  }) => {
+    const response = await api.post<ApiResponse<AIGeneratedProgram>>('/ai/generate-audit-program', data)
     return response.data
   },
 }

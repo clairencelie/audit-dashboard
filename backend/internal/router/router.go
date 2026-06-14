@@ -1,6 +1,10 @@
 package router
 
 import (
+	"os"
+	"time"
+
+	"github.com/clairencelie/audit-dashboard/backend/internal/ai"
 	"github.com/clairencelie/audit-dashboard/backend/internal/approvals"
 	"github.com/clairencelie/audit-dashboard/backend/internal/auth"
 	"github.com/clairencelie/audit-dashboard/backend/internal/auditprograms"
@@ -11,8 +15,6 @@ import (
 	"github.com/clairencelie/audit-dashboard/backend/internal/users"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
-	"os"
-	"time"
 )
 
 func Setup() *gin.Engine {
@@ -95,6 +97,9 @@ func Setup() *gin.Engine {
 		protected.GET("/dashboard/spv", middleware.RequireRoles("spv", "admin"), dashboard.SPV)
 		protected.GET("/dashboard/dept-head", middleware.RequireRoles("dept_head", "admin"), dashboard.DeptHead)
 		protected.GET("/dashboard/div-head", middleware.RequireRoles("div_head", "admin"), dashboard.DivHead)
+
+		// AI Assistance
+		protected.POST("/ai/generate-audit-program", middleware.RequireRoles("auditor"), ai.GenerateAuditProgram)
 	}
 
 	return r

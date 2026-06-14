@@ -15,8 +15,6 @@ const schema = z.object({
   auditee_id: z.string().min(1, 'Auditee wajib dipilih'),
   auditor_id: z.string().min(1, 'Auditor wajib dipilih'),
   spv_id: z.string().min(1, 'SPV wajib dipilih'),
-  dept_head_id: z.string().optional(),
-  div_head_id: z.string().optional(),
   priority: z.string().optional(),
   risk_level: z.string().optional(),
   planned_start_date: z.string().optional(),
@@ -66,10 +64,6 @@ export function CreateProjectModal({ open, onClose, onSuccess }: Props) {
     users?.data?.filter((u) => u.role?.name === 'auditor').map((u) => ({ value: u.id, label: u.name })) ?? []
   const spvOptions =
     users?.data?.filter((u) => u.role?.name === 'spv').map((u) => ({ value: u.id, label: u.name })) ?? []
-  const deptHeadOptions =
-    users?.data?.filter((u) => u.role?.name === 'dept_head').map((u) => ({ value: u.id, label: u.name })) ?? []
-  const divHeadOptions =
-    users?.data?.filter((u) => u.role?.name === 'div_head').map((u) => ({ value: u.id, label: u.name })) ?? []
 
   return (
     <Modal open={open} onClose={onClose} title="Buat Audit Project Baru" size="lg">
@@ -108,27 +102,13 @@ export function CreateProjectModal({ open, onClose, onSuccess }: Props) {
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <Select
-            label="Supervisor (SPV)"
-            required
-            options={spvOptions}
-            placeholder="Pilih SPV"
-            error={errors.spv_id?.message}
-            {...register('spv_id')}
-          />
-
-          <Select
-            label="Kepala Bagian"
-            options={[{ value: '', label: '— Opsional —' }, ...deptHeadOptions]}
-            {...register('dept_head_id')}
-          />
-        </div>
-
         <Select
-          label="Kepala Divisi"
-          options={[{ value: '', label: '— Opsional —' }, ...divHeadOptions]}
-          {...register('div_head_id')}
+          label="Supervisor (SPV)"
+          required
+          options={spvOptions}
+          placeholder="Pilih SPV"
+          error={errors.spv_id?.message}
+          {...register('spv_id')}
         />
 
         <div className="grid grid-cols-2 gap-4">
@@ -167,6 +147,10 @@ export function CreateProjectModal({ open, onClose, onSuccess }: Props) {
             {...register('planned_end_date')}
           />
         </div>
+
+        <p className="text-xs text-gray-500">
+          Kepala Bagian dan Kepala Divisi akan ditentukan otomatis oleh sistem.
+        </p>
 
         {mutation.error && (
           <p className="text-sm text-red-600">Gagal membuat project. Silakan coba lagi.</p>

@@ -17,8 +17,6 @@ type createProjectRequest struct {
 	AuditeeID         string `json:"auditee_id" binding:"required"`
 	AuditorID         string `json:"auditor_id" binding:"required"`
 	SPVID             string `json:"spv_id" binding:"required"`
-	DeptHeadID        string `json:"dept_head_id"`
-	DivHeadID         string `json:"div_head_id"`
 	Priority          string `json:"priority"`
 	RiskLevel         string `json:"risk_level"`
 	PlannedStartDate  string `json:"planned_start_date"`
@@ -140,14 +138,17 @@ func CreateProject(c *gin.Context) {
 	if req.RiskLevel != "" {
 		project.RiskLevel = req.RiskLevel
 	}
-	if req.DeptHeadID != "" {
-		did, _ := uuid.Parse(req.DeptHeadID)
-		project.DeptHeadID = &did
+
+	// Auto-assign the single active dept_head and div_head
+	var deptHead database.User
+	if err := database.DB.Joins("Role").Where("roles.name = ? AND users.is_active = true", "dept_head").First(&deptHead).Error; err == nil {
+		project.DeptHeadID = &deptHead.ID
 	}
-	if req.DivHeadID != "" {
-		did, _ := uuid.Parse(req.DivHeadID)
-		project.DivHeadID = &did
+	var divHead database.User
+	if err := database.DB.Joins("Role").Where("roles.name = ? AND users.is_active = true", "div_head").First(&divHead).Error; err == nil {
+		project.DivHeadID = &divHead.ID
 	}
+
 	if req.AnnualAuditPlanID != "" {
 		pid, _ := uuid.Parse(req.AnnualAuditPlanID)
 		project.AnnualAuditPlanID = &pid
