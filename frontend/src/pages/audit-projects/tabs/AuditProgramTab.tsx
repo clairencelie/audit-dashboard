@@ -7,10 +7,12 @@ import { Textarea } from '@/components/ui/Textarea'
 import { Input } from '@/components/ui/Input'
 import { Modal } from '@/components/ui/Modal'
 import { auditProgramsService } from '@/services/auditPrograms'
+import { documentsService } from '@/services/documents'
 import { useAuthStore } from '@/stores/authStore'
 import { formatDate, formatDateTime } from '@/lib/utils'
 import { PROGRAM_STATUS_LABELS, GEMINI_MODELS } from '@/types'
-import type { AuditProgram, AuditChecklist, AIGeneratedProgram, AIChecklist } from '@/types'
+import type { AuditProgram, AuditChecklist, AIGeneratedProgram, AIChecklist, ApprovalRequest, AuditDocument } from '@/types'
+import api from '@/lib/axios'
 import {
   Plus,
   FileText,
@@ -23,7 +25,15 @@ import {
   ChevronUp,
   Sparkles,
   X,
+  MessageSquare,
+  Stamp,
 } from 'lucide-react'
+
+const STAGE_LABELS: Record<string, string> = {
+  spv: 'Supervisor (SPV)',
+  dept_head: 'Kepala Bagian',
+  div_head: 'Kepala Divisi',
+}
 
 interface Props {
   project: {
@@ -87,6 +97,35 @@ export function AuditProgramTab({ project }: Props) {
 
   const canCreate = user?.role === 'auditor'
   const canApprove = ['spv', 'dept_head', 'div_head'].includes(user?.role ?? '')
+
+  // Approval history for the latest program
+  const latestProgram = programs[0]
+  const { data: approvalsData } = useQuery({
+    queryKey: ['program-approvals', latestProgram?.id],
+    queryFn: async () => {
+      const res = await api.get(
+        `/approvals?entity_type=audit_program&entity_id=${latestProgram!.id}`
+      )
+      return res.data.data as ApprovalRequest[]
+    },
+    enabled: !!latestProgram?.id,
+  })
+  const programApprovals = approvalsData ?? []
+
+  // Documents (STP/SPA)
+  const { data: docsData, refetch: refetchDocs } = useQuery({
+    queryKey: ['project-documents', project.id],
+    queryFn: () => documentsService.list(project.id),
+  })
+  const documents = docsData?.data ?? []
+
+  const issueMutation = useMutation({
+    mutationFn: () => documentsService.issue(project.id),
+    onSuccess: () => {
+      refetchDocs()
+      queryClient.invalidateQueries({ queryKey: ['audit-project', project.id] })
+    },
+  })
 
   if (isLoading) {
     return <div className="h-32 bg-gray-100 rounded-xl animate-pulse" />
@@ -267,6 +306,125 @@ export function AuditProgramTab({ project }: Props) {
               <p className="text-xs text-orange-600">Silakan perbaiki dan submit kembali.</p>
             </div>
           </div>
+        </Card>
+      )}
+
+      {/* Approval history & comments — visible to auditor */}
+      {canCreate && latestProgram && programApprovals.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <MessageSquare className="w-4 h-4 text-blue-500" />
+              Riwayat Review & Komentar
+            </CardTitle>
+          </CardHeader>
+          <div className="space-y-3">
+            {programApprovals.map((req) => (
+              <div key={req.id} className="border border-gray-100 rounded-lg p-3">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-semibold text-gray-600">
+                    {STAGE_LABELS[req.approval_stage] ?? req.approval_stage}
+                  </span>
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                    req.status === 'approved'
+                      ? 'bg-green-100 text-green-700'
+                      : req.status === 'rejected'
+                      ? 'bg-red-100 text-red-700'
+                      : 'bg-yellow-100 text-yellow-700'
+                  }`}>
+                    {req.status === 'approved' ? 'Disetujui' : req.status === 'rejected' ? 'Ditolak / Perlu Revisi' : 'Menunggu'}
+                  </span>
+                </div>
+                {req.histories && req.histories.length > 0 ? (
+                  <div className="space-y-2">
+                    {req.histories.map((h) => (
+                      <div key={h.id} className="flex items-start gap-2">
+                        {h.action === 'approved' ? (
+                          <CheckCircle className="w-4 h-4 text-green-500 mt-0.5 shrink-0" />
+                        ) : (
+                          <AlertCircle className="w-4 h-4 text-red-500 mt-0.5 shrink-0" />
+                        )}
+                        <div className="flex-1">
+                          <p className="text-xs font-medium text-gray-700">{h.approver?.name}</p>
+                          {h.comments ? (
+                            <p className="text-sm text-gray-800 bg-gray-50 rounded p-2 mt-1 whitespace-pre-wrap">{h.comments}</p>
+                          ) : (
+                            <p className="text-xs text-gray-400 italic">Tanpa komentar</p>
+                          )}
+                          <p className="text-xs text-gray-400 mt-1">{formatDateTime(h.action_at)}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-gray-400">Belum ada tindakan</p>
+                )}
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {/* STP & SPA section — visible after final_approved */}
+      {latestProgram?.status === 'final_approved' && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Stamp className="w-4 h-4 text-emerald-600" />
+              Penerbitan Surat Tugas & Surat Pengantar Audit
+            </CardTitle>
+          </CardHeader>
+
+          {documents.length > 0 ? (
+            <div className="space-y-3">
+              {documents.map((doc: AuditDocument) => (
+                <div
+                  key={doc.id}
+                  className="flex items-center justify-between p-3 bg-emerald-50 border border-emerald-200 rounded-lg"
+                >
+                  <div>
+                    <p className="text-sm font-semibold text-emerald-800">
+                      {doc.type === 'STP' ? 'Surat Tugas Pemeriksaan (STP)' : 'Surat Pengantar Audit (SPA)'}
+                    </p>
+                    <p className="text-lg font-bold text-emerald-900 mt-0.5">{doc.document_number}</p>
+                    <p className="text-xs text-emerald-600 mt-0.5">
+                      Diterbitkan oleh {doc.issued_by?.name} — {formatDateTime(doc.issued_at)}
+                    </p>
+                  </div>
+                  <CheckCircle className="w-8 h-8 text-emerald-500" />
+                </div>
+              ))}
+              <p className="text-xs text-gray-400 text-center pt-1">
+                Dokumen sudah diterbitkan. Status project telah berubah ke Fieldwork.
+              </p>
+            </div>
+          ) : canCreate ? (
+            <div className="text-center py-4">
+              <Stamp className="w-10 h-10 mx-auto mb-3 text-gray-300" />
+              <p className="text-sm text-gray-600 mb-1">
+                Audit Program sudah mendapat persetujuan final.
+              </p>
+              <p className="text-sm text-gray-500 mb-4">
+                Terbitkan nomor STP dan SPA untuk memulai fieldwork.
+              </p>
+              {issueMutation.isError && (
+                <p className="text-sm text-red-600 mb-3">
+                  {(issueMutation.error as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Gagal menerbitkan dokumen'}
+                </p>
+              )}
+              <Button
+                onClick={() => issueMutation.mutate()}
+                loading={issueMutation.isPending}
+              >
+                <Stamp className="w-4 h-4" />
+                Terbitkan STP & SPA
+              </Button>
+            </div>
+          ) : (
+            <p className="text-sm text-gray-400 text-center py-4">
+              Menunggu auditor menerbitkan nomor STP & SPA.
+            </p>
+          )}
         </Card>
       )}
 

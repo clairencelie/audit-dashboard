@@ -220,6 +220,19 @@ type Notification struct {
 	IsRead     bool       `gorm:"default:false" json:"is_read"`
 }
 
+// --- Audit Document (STP / SPA) ---
+
+type AuditDocument struct {
+	Base
+	AuditProjectID uuid.UUID    `gorm:"type:uuid;not null" json:"audit_project_id"`
+	AuditProject   AuditProject `gorm:"foreignKey:AuditProjectID" json:"audit_project,omitempty"`
+	Type           string       `gorm:"not null" json:"type"` // "STP" | "SPA"
+	DocumentNumber string       `gorm:"not null" json:"document_number"`
+	IssuedAt       time.Time    `json:"issued_at"`
+	IssuedByID     uuid.UUID    `gorm:"type:uuid;not null" json:"issued_by_id"`
+	IssuedBy       User         `gorm:"foreignKey:IssuedByID" json:"issued_by"`
+}
+
 // --- AI Log ---
 
 type AILog struct {

@@ -176,10 +176,10 @@ export interface PaginatedResponse<T> {
 export const PROJECT_STATUS_LABELS: Record<string, string> = {
   draft_audit_program: 'Draft Audit Program',
   submitted: 'Submitted',
-  approved_spv: 'Approved by SPV',
-  approved_dept_head: 'Approved by Dept Head',
-  approved_audit_program: 'Audit Program Approved',
-  fieldwork: 'Fieldwork',
+  approved_spv: 'Disetujui SPV',
+  approved_dept_head: 'Disetujui Kabag',
+  approved_audit_program: 'Audit Program Final Approved',
+  fieldwork: 'Fieldwork (STP/SPA Terbit)',
   draft_finding: 'Draft Finding',
   draft_report: 'Draft Report',
   report_released: 'Report Released',
@@ -213,6 +213,17 @@ export const RISK_LEVEL_COLORS: Record<string, string> = {
   medium: 'bg-yellow-100 text-yellow-700',
   high: 'bg-orange-100 text-orange-700',
   critical: 'bg-red-100 text-red-700',
+}
+
+export interface AuditDocument {
+  id: string
+  audit_project_id: string
+  type: 'STP' | 'SPA'
+  document_number: string
+  issued_at: string
+  issued_by_id: string
+  issued_by: User
+  created_at: string
 }
 
 export interface AIChecklist {

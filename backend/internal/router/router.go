@@ -6,6 +6,7 @@ import (
 
 	"github.com/clairencelie/audit-dashboard/backend/internal/ai"
 	"github.com/clairencelie/audit-dashboard/backend/internal/approvals"
+	"github.com/clairencelie/audit-dashboard/backend/internal/documents"
 	"github.com/clairencelie/audit-dashboard/backend/internal/auth"
 	"github.com/clairencelie/audit-dashboard/backend/internal/auditprograms"
 	"github.com/clairencelie/audit-dashboard/backend/internal/auditprojects"
@@ -100,6 +101,10 @@ func Setup() *gin.Engine {
 
 		// AI Assistance
 		protected.POST("/ai/generate-audit-program", middleware.RequireRoles("auditor"), ai.GenerateAuditProgram)
+
+		// Audit Documents (STP & SPA)
+		protected.POST("/audit-projects/:id/documents/issue", middleware.RequireRoles("auditor"), documents.IssueDocuments)
+		protected.GET("/audit-projects/:id/documents", documents.ListDocuments)
 	}
 
 	return r
