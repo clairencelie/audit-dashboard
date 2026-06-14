@@ -169,11 +169,38 @@ func ListExecutions(c *gin.Context) {
 		return
 	}
 
+	// Auto-create executions if project is in fieldwork but has none yet
+	var execCount int64
+	database.DB.Model(&database.ChecklistExecution{}).Where("audit_project_id = ?", projectID).Count(&execCount)
+	if execCount == 0 {
+		var project database.AuditProject
+		if err := database.DB.First(&project, "id = ?", projectID).Error; err == nil {
+			if project.Status == "fieldwork" || project.Status == "draft_finding" || project.Status == "draft_report" {
+				var approvedProgram database.AuditProgram
+				if err := database.DB.Preload("Checklists").
+					Where("audit_project_id = ? AND status = 'final_approved'", projectID).
+					First(&approvedProgram).Error; err == nil {
+					for _, cl := range approvedProgram.Checklists {
+						exec := database.ChecklistExecution{
+							AuditProjectID:     projectID,
+							AuditChecklistID:   cl.ID,
+							Status:             "not_started",
+							ProgressPercentage: 0,
+						}
+						database.DB.Create(&exec)
+					}
+				}
+			}
+		}
+	}
+
 	var executions []database.ChecklistExecution
 	database.DB.
 		Preload("AuditChecklist").
 		Preload("ReviewedBy").
 		Where("audit_project_id = ?", projectID).
+		Joins("JOIN audit_checklists ON audit_checklists.id = checklist_executions.audit_checklist_id").
+		Order("audit_checklists.sequence_no ASC").
 		Find(&executions)
 
 	response.OK(c, "Checklist executions retrieved", executions)

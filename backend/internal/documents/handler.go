@@ -12,17 +12,21 @@ import (
 
 var romanMonths = [...]string{"", "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII"}
 
-func generateNumber(docType string, issuedAt time.Time) string {
+func computeNumbers(issuedAt time.Time) (stpNum, spaNum string) {
 	year := issuedAt.Year()
-	month := int(issuedAt.Month())
+	month := romanMonths[int(issuedAt.Month())]
 
-	var count int64
+	var stpCount, spaCount, globalCount int64
 	database.DB.Model(&database.AuditDocument{}).
-		Where("type = ? AND EXTRACT(YEAR FROM issued_at) = ?", docType, year).
-		Count(&count)
+		Where("type = ? AND EXTRACT(YEAR FROM issued_at) = ?", "STP", year).Count(&stpCount)
+	database.DB.Model(&database.AuditDocument{}).
+		Where("type = ? AND EXTRACT(YEAR FROM issued_at) = ?", "SPA", year).Count(&spaCount)
+	database.DB.Model(&database.AuditDocument{}).
+		Where("EXTRACT(YEAR FROM issued_at) = ?", year).Count(&globalCount)
 
-	seq := int(count) + 1
-	return fmt.Sprintf("%03d/%s/%d/AUDIT", seq, romanMonths[month], year)
+	stpNum = fmt.Sprintf("%02d.%02d/AUDIT/%s/%d", int(stpCount)+1, int(globalCount)+1, month, year)
+	spaNum = fmt.Sprintf("%02d.%02d/AUDIT/%s/%d", int(spaCount)+1, int(globalCount)+2, month, year)
+	return
 }
 
 func IssueDocuments(c *gin.Context) {
@@ -53,8 +57,7 @@ func IssueDocuments(c *gin.Context) {
 	}
 
 	now := time.Now()
-	stpNumber := generateNumber("STP", now)
-	spaNumber := generateNumber("SPA", now)
+	stpNumber, spaNumber := computeNumbers(now)
 
 	stp := database.AuditDocument{
 		AuditProjectID: projectID,
@@ -76,6 +79,22 @@ func IssueDocuments(c *gin.Context) {
 
 	// Move project to fieldwork stage
 	database.DB.Model(&project).Update("status", "fieldwork")
+
+	// Auto-create ChecklistExecution records from the approved audit program's checklists
+	var approvedProgram database.AuditProgram
+	if err := database.DB.Preload("Checklists").
+		Where("audit_project_id = ? AND status = 'final_approved'", projectID).
+		First(&approvedProgram).Error; err == nil {
+		for _, cl := range approvedProgram.Checklists {
+			exec := database.ChecklistExecution{
+				AuditProjectID:   projectID,
+				AuditChecklistID: cl.ID,
+				Status:           "not_started",
+				ProgressPercentage: 0,
+			}
+			database.DB.Create(&exec)
+		}
+	}
 
 	database.DB.Preload("IssuedBy").First(&stp, "id = ?", stp.ID)
 	database.DB.Preload("IssuedBy").First(&spa, "id = ?", spa.ID)

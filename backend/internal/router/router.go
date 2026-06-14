@@ -6,14 +6,17 @@ import (
 
 	"github.com/clairencelie/audit-dashboard/backend/internal/ai"
 	"github.com/clairencelie/audit-dashboard/backend/internal/approvals"
-	"github.com/clairencelie/audit-dashboard/backend/internal/documents"
 	"github.com/clairencelie/audit-dashboard/backend/internal/auth"
 	"github.com/clairencelie/audit-dashboard/backend/internal/auditprograms"
 	"github.com/clairencelie/audit-dashboard/backend/internal/auditprojects"
 	"github.com/clairencelie/audit-dashboard/backend/internal/checklists"
+	"github.com/clairencelie/audit-dashboard/backend/internal/dailyeffort"
 	"github.com/clairencelie/audit-dashboard/backend/internal/dashboard"
+	"github.com/clairencelie/audit-dashboard/backend/internal/datarequests"
+	"github.com/clairencelie/audit-dashboard/backend/internal/documents"
 	"github.com/clairencelie/audit-dashboard/backend/internal/middleware"
 	"github.com/clairencelie/audit-dashboard/backend/internal/users"
+	"github.com/clairencelie/audit-dashboard/backend/internal/workingpapers"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 )
@@ -105,7 +108,27 @@ func Setup() *gin.Engine {
 		// Audit Documents (STP & SPA)
 		protected.POST("/audit-projects/:id/documents/issue", middleware.RequireRoles("auditor"), documents.IssueDocuments)
 		protected.GET("/audit-projects/:id/documents", documents.ListDocuments)
+
+		// Daily Effort
+		protected.GET("/projects/:id/daily-efforts", dailyeffort.List)
+		protected.POST("/projects/:id/daily-efforts", middleware.RequireRoles("auditor", "admin"), dailyeffort.Create)
+		protected.PUT("/daily-efforts/:id", middleware.RequireRoles("auditor", "admin"), dailyeffort.Update)
+		protected.DELETE("/daily-efforts/:id", middleware.RequireRoles("auditor", "admin"), dailyeffort.Delete)
+
+		// Working Papers
+		protected.GET("/projects/:id/working-papers", workingpapers.List)
+		protected.POST("/projects/:id/working-papers", middleware.RequireRoles("auditor", "admin"), workingpapers.Upload)
+		protected.DELETE("/working-papers/:id", middleware.RequireRoles("auditor", "admin"), workingpapers.Delete)
+
+		// Data Requests
+		protected.GET("/projects/:id/data-requests", datarequests.List)
+		protected.POST("/projects/:id/data-requests", middleware.RequireRoles("auditor", "admin"), datarequests.Create)
+		protected.PUT("/data-requests/:id", datarequests.Update)
+		protected.DELETE("/data-requests/:id", middleware.RequireRoles("auditor", "admin"), datarequests.Delete)
 	}
+
+	// Serve uploaded files
+	r.Static("/api/v1/uploads", "/app/uploads")
 
 	return r
 }

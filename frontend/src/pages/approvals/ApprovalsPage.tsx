@@ -19,7 +19,7 @@ import {
   ExternalLink,
   MessageSquare,
 } from 'lucide-react'
-import type { ApprovalRequest, AuditProgram } from '@/types'
+import type { ApprovalRequest, AuditProgram, AuditChecklist } from '@/types'
 import { PROGRAM_STATUS_LABELS } from '@/types'
 
 // ---- Stage labels ----
@@ -354,28 +354,7 @@ function ApprovalCard({
                   </p>
                   <div className="space-y-1.5">
                     {program.checklists.map((cl, i) => (
-                      <div
-                        key={cl.id}
-                        className="flex items-start gap-2 p-2.5 bg-gray-50 rounded-lg text-sm"
-                      >
-                        <span className="w-5 h-5 bg-white border border-gray-200 rounded-full flex items-center justify-center text-xs font-bold text-gray-600 shrink-0 mt-0.5">
-                          {i + 1}
-                        </span>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-gray-800">{cl.title}</p>
-                          {cl.objective && (
-                            <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{cl.objective}</p>
-                          )}
-                          <div className="flex items-center gap-2 mt-1">
-                            <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${cl.is_mandatory ? 'bg-blue-50 text-blue-600' : 'bg-gray-100 text-gray-500'}`}>
-                              {cl.is_mandatory ? 'Wajib' : 'Tambahan'}
-                            </span>
-                            {cl.source_criteria && (
-                              <span className="text-xs text-gray-400">{cl.source_criteria}</span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
+                      <ExpandableChecklist key={cl.id} checklist={cl} index={i + 1} />
                     ))}
                   </div>
                 </div>
@@ -442,6 +421,65 @@ function ProgramField({ label, value }: { label: string; value: string }) {
     <div>
       <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">{label}</p>
       <p className="text-sm text-gray-700 whitespace-pre-wrap">{value}</p>
+    </div>
+  )
+}
+
+function ExpandableChecklist({ checklist: cl, index }: { checklist: AuditChecklist; index: number }) {
+  const [expanded, setExpanded] = useState(false)
+  const hasDetail = cl.procedure_text || cl.required_data || cl.expected_evidence
+
+  return (
+    <div className="border border-gray-200 rounded-lg overflow-hidden text-sm">
+      <div
+        className={`flex items-start gap-2 p-2.5 bg-gray-50 ${hasDetail ? 'cursor-pointer hover:bg-gray-100' : ''} transition-colors`}
+        onClick={() => hasDetail && setExpanded(!expanded)}
+      >
+        <span className="w-5 h-5 bg-white border border-gray-200 rounded-full flex items-center justify-center text-xs font-bold text-gray-600 shrink-0 mt-0.5">
+          {index}
+        </span>
+        <div className="flex-1 min-w-0">
+          <p className="font-medium text-gray-800">{cl.title}</p>
+          {cl.objective && (
+            <p className="text-xs text-gray-500 mt-0.5">{cl.objective}</p>
+          )}
+          <div className="flex items-center gap-2 mt-1">
+            <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${cl.is_mandatory ? 'bg-blue-50 text-blue-600' : 'bg-gray-100 text-gray-500'}`}>
+              {cl.is_mandatory ? 'Wajib' : 'Tambahan'}
+            </span>
+            {cl.source_criteria && (
+              <span className="text-xs text-gray-400">{cl.source_criteria}</span>
+            )}
+          </div>
+        </div>
+        {hasDetail && (
+          <div className="shrink-0 mt-0.5">
+            {expanded ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
+          </div>
+        )}
+      </div>
+      {expanded && (
+        <div className="px-3 pb-3 pt-2 border-t border-gray-100 bg-white space-y-2">
+          {cl.procedure_text && (
+            <div>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-0.5">Prosedur Audit</p>
+              <p className="text-xs text-gray-700 whitespace-pre-wrap">{cl.procedure_text}</p>
+            </div>
+          )}
+          {cl.required_data && (
+            <div>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-0.5">Data Diperlukan</p>
+              <p className="text-xs text-gray-700">{cl.required_data}</p>
+            </div>
+          )}
+          {cl.expected_evidence && (
+            <div>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-0.5">Expected Evidence</p>
+              <p className="text-xs text-gray-700">{cl.expected_evidence}</p>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }

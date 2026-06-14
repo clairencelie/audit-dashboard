@@ -39,6 +39,9 @@ func Migrate() {
 		&AuditTrail{},
 		&AILog{},
 		&AuditDocument{},
+		&DailyEffort{},
+		&WorkingPaper{},
+		&DataRequest{},
 	)
 	if err != nil {
 		log.Fatalf("failed to migrate database: %v", err)

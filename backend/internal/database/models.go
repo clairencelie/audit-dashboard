@@ -233,6 +233,60 @@ type AuditDocument struct {
 	IssuedBy       User         `gorm:"foreignKey:IssuedByID" json:"issued_by"`
 }
 
+// --- Daily Effort ---
+
+type DailyEffort struct {
+	Base
+	AuditProjectID      uuid.UUID       `gorm:"type:uuid;not null" json:"audit_project_id"`
+	AuditProject        AuditProject    `gorm:"foreignKey:AuditProjectID" json:"audit_project,omitempty"`
+	AuditChecklistID    *uuid.UUID      `gorm:"type:uuid" json:"audit_checklist_id"`
+	AuditChecklist      *AuditChecklist `gorm:"foreignKey:AuditChecklistID" json:"audit_checklist,omitempty"`
+	AuditorID           uuid.UUID       `gorm:"type:uuid;not null" json:"auditor_id"`
+	Auditor             User            `gorm:"foreignKey:AuditorID" json:"auditor"`
+	Date                time.Time       `gorm:"type:date;not null" json:"date"`
+	HoursSpent          float64         `gorm:"default:0" json:"hours_spent"`
+	ActivityDescription string          `json:"activity_description"`
+	IssueEncountered    string          `json:"issue_encountered"`
+}
+
+// --- Working Paper ---
+
+type WorkingPaper struct {
+	Base
+	AuditProjectID       uuid.UUID           `gorm:"type:uuid;not null" json:"audit_project_id"`
+	AuditProject         AuditProject        `gorm:"foreignKey:AuditProjectID" json:"-"`
+	ChecklistExecutionID *uuid.UUID          `gorm:"type:uuid" json:"checklist_execution_id"`
+	ChecklistExecution   *ChecklistExecution `gorm:"foreignKey:ChecklistExecutionID" json:"checklist_execution,omitempty"`
+	AuditChecklistID     *uuid.UUID          `gorm:"type:uuid" json:"audit_checklist_id"`
+	AuditChecklist       *AuditChecklist     `gorm:"foreignKey:AuditChecklistID" json:"audit_checklist,omitempty"`
+	Title                string              `gorm:"not null" json:"title"`
+	FileName             string              `gorm:"not null" json:"file_name"`
+	FilePath             string              `gorm:"not null" json:"-"`
+	FileSize             int64               `json:"file_size"`
+	ContentType          string              `json:"content_type"`
+	UploadedByID         uuid.UUID           `gorm:"type:uuid;not null" json:"uploaded_by_id"`
+	UploadedBy           User                `gorm:"foreignKey:UploadedByID" json:"uploaded_by"`
+}
+
+// --- Data Request ---
+
+type DataRequest struct {
+	Base
+	AuditProjectID   uuid.UUID       `gorm:"type:uuid;not null" json:"audit_project_id"`
+	AuditProject     AuditProject    `gorm:"foreignKey:AuditProjectID" json:"-"`
+	AuditChecklistID *uuid.UUID      `gorm:"type:uuid" json:"audit_checklist_id"`
+	AuditChecklist   *AuditChecklist `gorm:"foreignKey:AuditChecklistID" json:"audit_checklist,omitempty"`
+	RequestedByID    uuid.UUID       `gorm:"type:uuid;not null" json:"requested_by_id"`
+	RequestedBy      User            `gorm:"foreignKey:RequestedByID" json:"requested_by"`
+	Title            string          `gorm:"not null" json:"title"`
+	Description      string          `json:"description"`
+	RequestedTo      string          `json:"requested_to"`
+	Status           string          `gorm:"default:'pending'" json:"status"` // pending, partial, received, not_available
+	DueDate          *time.Time      `json:"due_date"`
+	ReceivedAt       *time.Time      `json:"received_at"`
+	Notes            string          `json:"notes"`
+}
+
 // --- AI Log ---
 
 type AILog struct {

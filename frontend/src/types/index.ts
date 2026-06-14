@@ -112,7 +112,10 @@ export interface ChecklistExecution {
   completed_at?: string
   reviewed_by_id?: string
   reviewed_by?: User
+  reviewed_at?: string
   reviewer_note: string
+  created_at: string
+  updated_at: string
 }
 
 export interface ApprovalRequest {
@@ -257,13 +260,88 @@ export const GEMINI_MODELS = [
 ]
 
 export const CHECKLIST_EXECUTION_STATUS: Record<string, string> = {
-  not_started: 'Not Started',
-  in_progress: 'In Progress',
-  waiting_data: 'Waiting Data',
-  testing_done: 'Testing Done',
-  exception_found: 'Exception Found',
-  no_exception: 'No Exception',
-  need_review: 'Need Review',
-  reviewed: 'Reviewed',
-  completed: 'Completed',
+  not_started: 'Belum Dimulai',
+  in_progress: 'Sedang Dikerjakan',
+  waiting_data: 'Menunggu Data',
+  testing_done: 'Testing Selesai',
+  exception_found: 'Ditemukan Temuan',
+  no_exception: 'Tidak Ada Temuan',
+  need_review: 'Perlu Review',
+  reviewed: 'Sudah Direview',
+  completed: 'Selesai',
+}
+
+export const CHECKLIST_EXECUTION_STATUS_COLORS: Record<string, string> = {
+  not_started: 'bg-gray-100 text-gray-600',
+  in_progress: 'bg-blue-100 text-blue-700',
+  waiting_data: 'bg-yellow-100 text-yellow-700',
+  testing_done: 'bg-indigo-100 text-indigo-700',
+  exception_found: 'bg-red-100 text-red-700',
+  no_exception: 'bg-green-100 text-green-700',
+  need_review: 'bg-orange-100 text-orange-700',
+  reviewed: 'bg-teal-100 text-teal-700',
+  completed: 'bg-emerald-100 text-emerald-700',
+}
+
+export interface DailyEffort {
+  id: string
+  audit_project_id: string
+  audit_checklist_id?: string
+  audit_checklist?: AuditChecklist
+  auditor_id: string
+  auditor: User
+  date: string
+  activity_description: string
+  issue_encountered: string
+  created_at: string
+  updated_at: string
+}
+
+export interface WorkingPaper {
+  id: string
+  audit_project_id: string
+  checklist_execution_id?: string
+  checklist_execution?: ChecklistExecution
+  audit_checklist_id?: string
+  audit_checklist?: AuditChecklist
+  title: string
+  file_name: string
+  file_url: string
+  file_size: number
+  content_type: string
+  uploaded_by_id: string
+  uploaded_by: User
+  created_at: string
+}
+
+export interface DataRequest {
+  id: string
+  audit_project_id: string
+  audit_checklist_id?: string
+  audit_checklist?: AuditChecklist
+  requested_by_id: string
+  requested_by: User
+  title: string
+  description: string
+  requested_to: string
+  status: 'pending' | 'partial' | 'received' | 'not_available'
+  due_date?: string
+  received_at?: string
+  notes: string
+  created_at: string
+  updated_at: string
+}
+
+export const DATA_REQUEST_STATUS_LABELS: Record<string, string> = {
+  pending: 'Belum Diterima',
+  partial: 'Sebagian Diterima',
+  received: 'Sudah Diterima',
+  not_available: 'Data Tidak Tersedia',
+}
+
+export const DATA_REQUEST_STATUS_COLORS: Record<string, string> = {
+  pending: 'bg-yellow-100 text-yellow-700',
+  partial: 'bg-orange-100 text-orange-700',
+  received: 'bg-green-100 text-green-700',
+  not_available: 'bg-gray-100 text-gray-600',
 }

@@ -11,8 +11,9 @@ import { documentsService } from '@/services/documents'
 import { useAuthStore } from '@/stores/authStore'
 import { formatDate, formatDateTime } from '@/lib/utils'
 import { PROGRAM_STATUS_LABELS, GEMINI_MODELS } from '@/types'
-import type { AuditProgram, AuditChecklist, AIGeneratedProgram, AIChecklist, ApprovalRequest, AuditDocument } from '@/types'
+import type { AuditProject, AuditProgram, AuditChecklist, AIGeneratedProgram, AIChecklist, ApprovalRequest, AuditDocument } from '@/types'
 import api from '@/lib/axios'
+import { printSTP, printSPA } from '@/lib/printDocument'
 import {
   Plus,
   FileText,
@@ -27,6 +28,7 @@ import {
   X,
   MessageSquare,
   Stamp,
+  Printer,
 } from 'lucide-react'
 
 const STAGE_LABELS: Record<string, string> = {
@@ -36,15 +38,7 @@ const STAGE_LABELS: Record<string, string> = {
 }
 
 interface Props {
-  project: {
-    id: string
-    status: string
-    spv_id: string
-    audit_theme?: string
-    auditee?: { name: string }
-    planned_start_date?: string
-    planned_end_date?: string
-  }
+  project: AuditProject
 }
 
 export function AuditProgramTab({ project }: Props) {
@@ -53,11 +47,12 @@ export function AuditProgramTab({ project }: Props) {
   const [showCreate, setShowCreate] = useState(false)
   const [showAddChecklist, setShowAddChecklist] = useState(false)
   const [expandedChecklist, setExpandedChecklist] = useState<string | null>(null)
-  const [rejectModal, setRejectModal] = useState<{ open: boolean; programId: string }>({
-    open: false,
-    programId: '',
-  })
-  const [rejectComment, setRejectComment] = useState('')
+  const [actionModal, setActionModal] = useState<{
+    open: boolean
+    programId: string
+    type: 'approve' | 'reject'
+  }>({ open: false, programId: '', type: 'approve' })
+  const [actionComment, setActionComment] = useState('')
 
   const { data, isLoading } = useQuery({
     queryKey: ['audit-program', project.id],
@@ -75,6 +70,8 @@ export function AuditProgramTab({ project }: Props) {
     mutationFn: ({ id, comments }: { id: string; comments?: string }) =>
       auditProgramsService.approve(id, comments),
     onSuccess: () => {
+      setActionModal({ open: false, programId: '', type: 'approve' })
+      setActionComment('')
       queryClient.invalidateQueries({ queryKey: ['audit-program', project.id] })
       queryClient.invalidateQueries({ queryKey: ['audit-project', project.id] })
     },
@@ -84,8 +81,8 @@ export function AuditProgramTab({ project }: Props) {
     mutationFn: ({ id, comments }: { id: string; comments: string }) =>
       auditProgramsService.reject(id, comments),
     onSuccess: () => {
-      setRejectModal({ open: false, programId: '' })
-      setRejectComment('')
+      setActionModal({ open: false, programId: '', type: 'approve' })
+      setActionComment('')
       queryClient.invalidateQueries({ queryKey: ['audit-program', project.id] })
     },
   })
@@ -97,6 +94,13 @@ export function AuditProgramTab({ project }: Props) {
 
   const canCreate = user?.role === 'auditor'
   const canApprove = ['spv', 'dept_head', 'div_head'].includes(user?.role ?? '')
+
+  function canApproveAtStage(status: string): boolean {
+    if (user?.role === 'spv' && status === 'submitted') return true
+    if (user?.role === 'dept_head' && status === 'approved_spv') return true
+    if (user?.role === 'div_head' && status === 'approved_dept_head') return true
+    return false
+  }
 
   // Approval history for the latest program
   const latestProgram = programs[0]
@@ -171,19 +175,18 @@ export function AuditProgramTab({ project }: Props) {
                     Submit untuk Review
                   </Button>
                 )}
-                {canApprove && program.status === 'submitted' && (
+                {canApproveAtStage(program.status) && (
                   <>
                     <Button
                       size="sm"
                       variant="danger"
-                      onClick={() => setRejectModal({ open: true, programId: program.id })}
+                      onClick={() => setActionModal({ open: true, programId: program.id, type: 'reject' })}
                     >
                       Tolak
                     </Button>
                     <Button
                       size="sm"
-                      onClick={() => approveMutation.mutate({ id: program.id })}
-                      loading={approveMutation.isPending}
+                      onClick={() => setActionModal({ open: true, programId: program.id, type: 'approve' })}
                     >
                       <CheckCircle className="w-4 h-4" />
                       Approve
@@ -309,8 +312,8 @@ export function AuditProgramTab({ project }: Props) {
         </Card>
       )}
 
-      {/* Approval history & comments — visible to auditor */}
-      {canCreate && latestProgram && programApprovals.length > 0 && (
+      {/* Approval history & comments — visible to all relevant roles */}
+      {(canCreate || canApprove) && latestProgram && programApprovals.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -391,7 +394,18 @@ export function AuditProgramTab({ project }: Props) {
                       Diterbitkan oleh {doc.issued_by?.name} — {formatDateTime(doc.issued_at)}
                     </p>
                   </div>
-                  <CheckCircle className="w-8 h-8 text-emerald-500" />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      if (!latestProgram) return
+                      if (doc.type === 'STP') printSTP(project, latestProgram, doc)
+                      else printSPA(project, latestProgram, doc)
+                    }}
+                  >
+                    <Printer className="w-4 h-4" />
+                    Cetak
+                  </Button>
                 </div>
               ))}
               <p className="text-xs text-gray-400 text-center pt-1">
@@ -440,35 +454,46 @@ export function AuditProgramTab({ project }: Props) {
         />
       )}
 
-      {/* Reject Modal */}
+      {/* Approve / Reject Modal */}
       <Modal
-        open={rejectModal.open}
-        onClose={() => setRejectModal({ open: false, programId: '' })}
-        title="Tolak Audit Program"
+        open={actionModal.open}
+        onClose={() => { setActionModal({ open: false, programId: '', type: 'approve' }); setActionComment('') }}
+        title={actionModal.type === 'approve' ? 'Setujui Audit Program' : 'Tolak Audit Program'}
         size="sm"
       >
         <div className="space-y-4">
           <Textarea
-            label="Alasan Penolakan"
-            required
-            placeholder="Jelaskan alasan penolakan..."
-            value={rejectComment}
-            onChange={(e) => setRejectComment(e.target.value)}
+            label={actionModal.type === 'approve' ? 'Komentar (opsional)' : 'Alasan Penolakan'}
+            required={actionModal.type === 'reject'}
+            placeholder={actionModal.type === 'approve' ? 'Tambahkan catatan jika ada...' : 'Jelaskan alasan penolakan...'}
+            value={actionComment}
+            onChange={(e) => setActionComment(e.target.value)}
           />
           <div className="flex justify-end gap-3">
-            <Button variant="outline" onClick={() => setRejectModal({ open: false, programId: '' })}>
+            <Button
+              variant="outline"
+              onClick={() => { setActionModal({ open: false, programId: '', type: 'approve' }); setActionComment('') }}
+            >
               Batal
             </Button>
-            <Button
-              variant="danger"
-              loading={rejectMutation.isPending}
-              disabled={!rejectComment}
-              onClick={() =>
-                rejectMutation.mutate({ id: rejectModal.programId, comments: rejectComment })
-              }
-            >
-              Tolak
-            </Button>
+            {actionModal.type === 'approve' ? (
+              <Button
+                loading={approveMutation.isPending}
+                onClick={() => approveMutation.mutate({ id: actionModal.programId, comments: actionComment || undefined })}
+              >
+                <CheckCircle className="w-4 h-4" />
+                Setujui
+              </Button>
+            ) : (
+              <Button
+                variant="danger"
+                loading={rejectMutation.isPending}
+                disabled={!actionComment}
+                onClick={() => rejectMutation.mutate({ id: actionModal.programId, comments: actionComment })}
+              >
+                Tolak
+              </Button>
+            )}
           </div>
         </div>
       </Modal>
@@ -688,7 +713,7 @@ function CreateProgramModal({
   onClose,
   onSuccess,
 }: {
-  project: Props['project']
+  project: AuditProject
   onClose: () => void
   onSuccess: () => void
 }) {
@@ -843,7 +868,7 @@ function AIAssistModal({
   onClose,
   onApply,
 }: {
-  project: Props['project']
+  project: AuditProject
   onClose: () => void
   onApply: (draft: AIGeneratedProgram) => void
 }) {

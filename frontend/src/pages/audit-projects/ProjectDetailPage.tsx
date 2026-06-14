@@ -9,6 +9,10 @@ import { formatDate } from '@/lib/utils'
 import { PROJECT_STATUS_LABELS, PROJECT_STATUS_COLORS, RISK_LEVEL_COLORS } from '@/types'
 import { useAuthStore } from '@/stores/authStore'
 import { AuditProgramTab } from './tabs/AuditProgramTab'
+import { ChecklistExecutionTab } from './tabs/ChecklistExecutionTab'
+import { DailyEffortTab } from './tabs/DailyEffortTab'
+import { WorkingPaperTab } from './tabs/WorkingPaperTab'
+import { DataRequestTab } from './tabs/DataRequestTab'
 import {
   ChevronLeft,
   Calendar,
@@ -16,9 +20,12 @@ import {
   ClipboardList,
   CheckSquare,
   FileText,
+  Clock,
+  Upload,
+  Database,
 } from 'lucide-react'
 
-type Tab = 'overview' | 'audit-program' | 'checklists' | 'approvals'
+type Tab = 'overview' | 'audit-program' | 'checklists' | 'daily-effort' | 'working-papers' | 'data-requests'
 
 export function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -53,10 +60,31 @@ export function ProjectDetailPage() {
     )
   }
 
-  const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
+  const isFieldwork = project.status === 'fieldwork'
+
+  const tabs: { id: Tab; label: string; icon: React.ReactNode; disabled?: boolean }[] = [
     { id: 'overview', label: 'Overview', icon: <ClipboardList className="w-4 h-4" /> },
     { id: 'audit-program', label: 'Audit Program', icon: <FileText className="w-4 h-4" /> },
-    { id: 'checklists', label: 'Checklist', icon: <CheckSquare className="w-4 h-4" /> },
+    {
+      id: 'checklists',
+      label: 'Checklist',
+      icon: <CheckSquare className="w-4 h-4" />,
+    },
+    {
+      id: 'daily-effort',
+      label: 'Daily Effort',
+      icon: <Clock className="w-4 h-4" />,
+    },
+    {
+      id: 'working-papers',
+      label: 'Working Papers',
+      icon: <Upload className="w-4 h-4" />,
+    },
+    {
+      id: 'data-requests',
+      label: 'Data Request',
+      icon: <Database className="w-4 h-4" />,
+    },
   ]
 
   return (
@@ -129,15 +157,18 @@ export function ProjectDetailPage() {
         </div>
 
         {/* Tabs */}
-        <div className="border-b border-gray-200">
-          <nav className="flex gap-1">
+        <div className="border-b border-gray-200 overflow-x-auto">
+          <nav className="flex gap-1 min-w-max">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+                onClick={() => !tab.disabled && setActiveTab(tab.id)}
+                disabled={tab.disabled}
+                className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
                   activeTab === tab.id
                     ? 'border-blue-600 text-blue-600'
+                    : tab.disabled
+                    ? 'border-transparent text-gray-300 cursor-not-allowed'
                     : 'border-transparent text-gray-500 hover:text-gray-700'
                 }`}
               >
@@ -151,13 +182,10 @@ export function ProjectDetailPage() {
         {/* Tab Content */}
         {activeTab === 'overview' && <ProjectOverview project={project} />}
         {activeTab === 'audit-program' && <AuditProgramTab project={project} />}
-        {activeTab === 'checklists' && (
-          <Card>
-            <p className="text-gray-500 text-sm">
-              Checklist execution tersedia setelah audit program diapprove.
-            </p>
-          </Card>
-        )}
+        {activeTab === 'checklists' && <ChecklistExecutionTab project={project} />}
+        {activeTab === 'daily-effort' && <DailyEffortTab project={project} />}
+        {activeTab === 'working-papers' && <WorkingPaperTab project={project} />}
+        {activeTab === 'data-requests' && <DataRequestTab project={project} />}
       </div>
     </div>
   )
@@ -220,6 +248,14 @@ function ProjectOverview({ project }: { project: import('@/types').AuditProject 
             />
           </div>
         </div>
+
+        {project.status === 'fieldwork' && (
+          <div className="mt-4 pt-4 border-t border-gray-100">
+            <p className="text-xs text-center text-purple-600 font-medium bg-purple-50 rounded-lg px-3 py-2">
+              Fieldwork sedang berjalan
+            </p>
+          </div>
+        )}
       </Card>
     </div>
   )
