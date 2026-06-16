@@ -6,6 +6,7 @@ import (
 
 	"github.com/clairencelie/audit-dashboard/backend/internal/config"
 	"github.com/clairencelie/audit-dashboard/backend/internal/database"
+	"github.com/clairencelie/audit-dashboard/backend/internal/drive"
 	"github.com/clairencelie/audit-dashboard/backend/internal/router"
 	"github.com/joho/godotenv"
 )
@@ -19,6 +20,12 @@ func main() {
 
 	database.Connect(cfg.DatabaseURL)
 	database.Migrate()
+
+	if err := drive.Init(); err != nil {
+		log.Printf("Warning: Google Drive integration disabled: %v", err)
+	} else {
+		log.Println("Google Drive integration enabled")
+	}
 
 	if os.Getenv("APP_ENV") == "development" || os.Getenv("SEED_DB") == "true" {
 		database.Seed()

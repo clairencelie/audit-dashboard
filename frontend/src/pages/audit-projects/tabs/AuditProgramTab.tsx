@@ -1014,7 +1014,7 @@ function AIAssistModal({
           </div>
 
           {editedDraft && (
-            <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
+            <div className="space-y-3">
               <Textarea
                 label="Tujuan Pemeriksaan"
                 rows={3}

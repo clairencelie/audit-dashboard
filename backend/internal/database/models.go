@@ -249,6 +249,24 @@ type DailyEffort struct {
 	IssueEncountered    string          `json:"issue_encountered"`
 }
 
+// --- Reference Document ---
+
+type ReferenceDocument struct {
+	Base
+	AuditProjectID uuid.UUID    `gorm:"type:uuid;not null" json:"audit_project_id"`
+	AuditProject   AuditProject `gorm:"foreignKey:AuditProjectID" json:"-"`
+	Title          string       `gorm:"not null" json:"title"`
+	Category       string       `gorm:"not null;default:'Lainnya'" json:"category"` // Regulasi | SOP | Standar Audit | Kebijakan | Lainnya
+	FileName       string       `gorm:"not null" json:"file_name"`
+	FilePath       string       `gorm:"default:''" json:"-"`
+	DriveFileID    string       `json:"-"`
+	DriveFileURL   string       `json:"drive_file_url"`
+	FileSize       int64        `json:"file_size"`
+	ContentType    string       `json:"content_type"`
+	UploadedByID   uuid.UUID    `gorm:"type:uuid;not null" json:"uploaded_by_id"`
+	UploadedBy     User         `gorm:"foreignKey:UploadedByID" json:"uploaded_by"`
+}
+
 // --- Working Paper ---
 
 type WorkingPaper struct {
@@ -261,7 +279,9 @@ type WorkingPaper struct {
 	AuditChecklist       *AuditChecklist     `gorm:"foreignKey:AuditChecklistID" json:"audit_checklist,omitempty"`
 	Title                string              `gorm:"not null" json:"title"`
 	FileName             string              `gorm:"not null" json:"file_name"`
-	FilePath             string              `gorm:"not null" json:"-"`
+	FilePath             string              `gorm:"default:''" json:"-"`
+	DriveFileID          string              `json:"-"`
+	DriveFileURL         string              `json:"drive_file_url"`
 	FileSize             int64               `json:"file_size"`
 	ContentType          string              `json:"content_type"`
 	UploadedByID         uuid.UUID           `gorm:"type:uuid;not null" json:"uploaded_by_id"`

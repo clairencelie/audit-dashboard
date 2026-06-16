@@ -40,6 +40,7 @@ func Migrate() {
 		&AILog{},
 		&AuditDocument{},
 		&DailyEffort{},
+		&ReferenceDocument{},
 		&WorkingPaper{},
 		&DataRequest{},
 	)

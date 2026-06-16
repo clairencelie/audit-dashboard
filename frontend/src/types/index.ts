@@ -307,6 +307,21 @@ export interface WorkingPaper {
   title: string
   file_name: string
   file_url: string
+  drive_file_url: string
+  file_size: number
+  content_type: string
+  uploaded_by_id: string
+  uploaded_by: User
+  created_at: string
+}
+
+export interface ReferenceDocument {
+  id: string
+  audit_project_id: string
+  title: string
+  category: 'Regulasi' | 'SOP' | 'Standar Audit' | 'Kebijakan' | 'Lainnya'
+  file_name: string
+  drive_file_url: string
   file_size: number
   content_type: string
   uploaded_by_id: string

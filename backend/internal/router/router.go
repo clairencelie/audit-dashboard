@@ -2,6 +2,7 @@ package router
 
 import (
 	"os"
+	"strings"
 	"time"
 
 	"github.com/clairencelie/audit-dashboard/backend/internal/ai"
@@ -16,6 +17,7 @@ import (
 	"github.com/clairencelie/audit-dashboard/backend/internal/documents"
 	"github.com/clairencelie/audit-dashboard/backend/internal/middleware"
 	"github.com/clairencelie/audit-dashboard/backend/internal/users"
+	"github.com/clairencelie/audit-dashboard/backend/internal/referencedocs"
 	"github.com/clairencelie/audit-dashboard/backend/internal/workingpapers"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -24,8 +26,13 @@ import (
 func Setup() *gin.Engine {
 	r := gin.Default()
 
+	frontendURLs := strings.Split(getEnv("FRONTEND_URL", "http://localhost:5173"), ",")
+	for i := range frontendURLs {
+		frontendURLs[i] = strings.TrimSpace(frontendURLs[i])
+	}
+
 	r.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{getEnv("FRONTEND_URL", "http://localhost:5173")},
+		AllowOrigins:     frontendURLs,
 		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
 		ExposeHeaders:    []string{"Content-Length"},
@@ -119,6 +126,11 @@ func Setup() *gin.Engine {
 		protected.GET("/projects/:id/working-papers", workingpapers.List)
 		protected.POST("/projects/:id/working-papers", middleware.RequireRoles("auditor", "admin"), workingpapers.Upload)
 		protected.DELETE("/working-papers/:id", middleware.RequireRoles("auditor", "admin"), workingpapers.Delete)
+
+		// Reference Documents
+		protected.GET("/projects/:id/reference-docs", referencedocs.List)
+		protected.POST("/projects/:id/reference-docs", middleware.RequireRoles("auditor", "admin"), referencedocs.Upload)
+		protected.DELETE("/reference-docs/:id", middleware.RequireRoles("auditor", "admin"), referencedocs.Delete)
 
 		// Data Requests
 		protected.GET("/projects/:id/data-requests", datarequests.List)
