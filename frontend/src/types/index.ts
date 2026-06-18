@@ -360,3 +360,125 @@ export const DATA_REQUEST_STATUS_COLORS: Record<string, string> = {
   received: 'bg-green-100 text-green-700',
   not_available: 'bg-gray-100 text-gray-600',
 }
+
+export interface FindingAttachment {
+  id: string
+  finding_id: string
+  title: string
+  file_name: string
+  drive_file_url: string
+  file_size: number
+  content_type: string
+  uploaded_by_id: string
+  uploaded_by: User
+  created_at: string
+}
+
+export interface Finding {
+  id: string
+  audit_project_id: string
+  checklist_execution_id?: string
+  checklist_execution?: ChecklistExecution
+
+  subject_area: string
+  finding_category: string
+  criteria_text: string
+  risk_type: string
+  risk_rating: 'low' | 'medium' | 'high'
+
+  condition_text: string
+
+  impact_quantity: number
+  impact_loss_value: number
+  impact_potential_risk: string
+
+  auditee_response_condition: string
+
+  cause_kebijakan: string
+  cause_sistem: string
+  cause_sdm: string
+  cause_eksternal: string
+
+  rec_kebijakan: string
+  rec_sistem: string
+  rec_sdm: string
+  rec_eksternal: string
+
+  auditee_rec_kebijakan: string
+  auditee_rec_sistem: string
+  auditee_rec_sdm: string
+  auditee_rec_eksternal: string
+
+  auditee_pic: string
+  deadline_date?: string
+
+  status: string
+  created_by_id: string
+  created_by: User
+  submitted_at?: string
+  approval_requests?: ApprovalRequest[]
+  attachments?: FindingAttachment[]
+  created_at: string
+  updated_at: string
+}
+
+export const FINDING_STATUS_LABELS: Record<string, string> = {
+  draft: 'Draft',
+  submitted: 'Submitted',
+  need_revision: 'Perlu Revisi',
+  approved_spv: 'Disetujui SPV',
+  approved_dept_head: 'Disetujui Kabag',
+  final_approved: 'Final Approved',
+  sent_to_auditee: 'Dikirim ke Auditee',
+  auditee_responded: 'Auditee Sudah Merespons',
+  closed: 'Closed',
+}
+
+export const FINDING_STATUS_COLORS: Record<string, string> = {
+  draft: 'bg-gray-100 text-gray-700',
+  submitted: 'bg-yellow-100 text-yellow-700',
+  need_revision: 'bg-red-100 text-red-700',
+  approved_spv: 'bg-blue-100 text-blue-700',
+  approved_dept_head: 'bg-indigo-100 text-indigo-700',
+  final_approved: 'bg-green-100 text-green-700',
+  sent_to_auditee: 'bg-purple-100 text-purple-700',
+  auditee_responded: 'bg-teal-100 text-teal-700',
+  closed: 'bg-gray-200 text-gray-600',
+}
+
+export const FINDING_RISK_RATING_LABELS: Record<string, string> = {
+  low: 'Rendah',
+  medium: 'Sedang',
+  high: 'Tinggi',
+}
+
+export const FINDING_RISK_RATING_COLORS: Record<string, string> = {
+  low: 'bg-green-100 text-green-700',
+  medium: 'bg-yellow-100 text-yellow-700',
+  high: 'bg-orange-100 text-orange-700',
+}
+
+export const FINDING_CATEGORY_OPTIONS = [
+  'Untuk Menjadi Perhatian',
+  'Pelanggaran Administrasi Material',
+  'Pelanggaran Integritas',
+]
+
+export const FINDING_RISK_TYPE_OPTIONS = [
+  'Risiko Strategis',
+  'Risiko Operasional',
+  'Risiko Asuransi',
+  'Risiko Kredit',
+  'Risiko Pasar',
+  'Risiko Likuiditas',
+  'Risiko Hukum',
+  'Risiko Kepatuhan',
+  'Risiko Reputasi',
+]
+
+export const FINDING_CAUSE_CATEGORIES = [
+  { key: 'kebijakan', label: 'Kebijakan' },
+  { key: 'sistem', label: 'Sistem' },
+  { key: 'sdm', label: 'SDM' },
+  { key: 'eksternal', label: 'Eksternal' },
+] as const

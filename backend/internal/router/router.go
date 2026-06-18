@@ -15,6 +15,7 @@ import (
 	"github.com/clairencelie/audit-dashboard/backend/internal/dashboard"
 	"github.com/clairencelie/audit-dashboard/backend/internal/datarequests"
 	"github.com/clairencelie/audit-dashboard/backend/internal/documents"
+	"github.com/clairencelie/audit-dashboard/backend/internal/findings"
 	"github.com/clairencelie/audit-dashboard/backend/internal/middleware"
 	"github.com/clairencelie/audit-dashboard/backend/internal/users"
 	"github.com/clairencelie/audit-dashboard/backend/internal/referencedocs"
@@ -137,6 +138,20 @@ func Setup() *gin.Engine {
 		protected.POST("/projects/:id/data-requests", middleware.RequireRoles("auditor", "admin"), datarequests.Create)
 		protected.PUT("/data-requests/:id", datarequests.Update)
 		protected.DELETE("/data-requests/:id", middleware.RequireRoles("auditor", "admin"), datarequests.Delete)
+
+		// Findings
+		protected.GET("/projects/:id/findings", findings.List)
+		protected.POST("/projects/:id/findings", middleware.RequireRoles("auditor", "admin"), findings.Create)
+		protected.GET("/findings/:id", findings.Get)
+		protected.PUT("/findings/:id", middleware.RequireRoles("auditor", "admin"), findings.Update)
+		protected.DELETE("/findings/:id", middleware.RequireRoles("auditor", "admin"), findings.Delete)
+		protected.POST("/findings/:id/submit", middleware.RequireRoles("auditor", "admin"), findings.Submit)
+		protected.POST("/findings/:id/approve", middleware.RequireRoles("spv", "dept_head", "div_head"), findings.Approve)
+		protected.POST("/findings/:id/reject", middleware.RequireRoles("spv", "dept_head", "div_head"), findings.Reject)
+		protected.POST("/findings/:id/auditee-response", middleware.RequireRoles("auditor", "admin"), findings.RecordAuditeeResponse)
+		protected.GET("/findings/:id/attachments", findings.ListAttachments)
+		protected.POST("/findings/:id/attachments", middleware.RequireRoles("auditor", "admin"), findings.UploadAttachment)
+		protected.DELETE("/finding-attachments/:id", middleware.RequireRoles("auditor", "admin"), findings.DeleteAttachment)
 	}
 
 	// Serve uploaded files

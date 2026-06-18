@@ -307,6 +307,82 @@ type DataRequest struct {
 	Notes            string          `json:"notes"`
 }
 
+// --- Finding ---
+//
+// Field mengikuti format Laporan Hasil Audit (LHA) yang dipakai perusahaan:
+// kolom Penyebab, Rekomendasi, dan Tanggapan Auditee atas Rekomendasi masing-masing
+// dipecah menjadi 4 sub-kategori baku (Kebijakan, Sistem, SDM, Eksternal).
+
+type Finding struct {
+	Base
+	AuditProjectID       uuid.UUID           `gorm:"type:uuid;not null" json:"audit_project_id"`
+	AuditProject         AuditProject        `gorm:"foreignKey:AuditProjectID" json:"-"`
+	ChecklistExecutionID *uuid.UUID          `gorm:"type:uuid" json:"checklist_execution_id"`
+	ChecklistExecution   *ChecklistExecution `gorm:"foreignKey:ChecklistExecutionID" json:"checklist_execution,omitempty"`
+
+	// Header
+	SubjectArea     string `gorm:"type:text" json:"subject_area"` // Subjek Pemeriksaan (free text)
+	FindingCategory string `json:"finding_category"`              // Kategori Temuan: salah satu dari 3 nilai baku
+	CriteriaText    string `gorm:"type:text" json:"criteria_text"`
+	RiskType        string `json:"risk_type"` // Jenis Risiko, mengacu 9 jenis risiko perusahaan
+	RiskRating      string `gorm:"default:'medium'" json:"risk_rating"`
+
+	// Kondisi
+	ConditionText string `gorm:"type:text" json:"condition_text"`
+
+	// Dampak
+	ImpactQuantity      int     `gorm:"default:0" json:"impact_quantity"`
+	ImpactLossValue     float64 `gorm:"default:0" json:"impact_loss_value"`
+	ImpactPotentialRisk string  `gorm:"type:text" json:"impact_potential_risk"`
+
+	// Tanggapan auditee atas kondisi (dicatat saat fieldwork)
+	AuditeeResponseCondition string `gorm:"type:text" json:"auditee_response_condition"`
+
+	// Penyebab per kategori
+	CauseKebijakan string `gorm:"type:text" json:"cause_kebijakan"`
+	CauseSistem    string `gorm:"type:text" json:"cause_sistem"`
+	CauseSDM       string `gorm:"type:text" json:"cause_sdm"`
+	CauseEksternal string `gorm:"type:text" json:"cause_eksternal"`
+
+	// Rekomendasi per kategori
+	RecKebijakan string `gorm:"type:text" json:"rec_kebijakan"`
+	RecSistem    string `gorm:"type:text" json:"rec_sistem"`
+	RecSDM       string `gorm:"type:text" json:"rec_sdm"`
+	RecEksternal string `gorm:"type:text" json:"rec_eksternal"`
+
+	// Tanggapan auditee atas rekomendasi per kategori (diisi setelah rekomendasi disepakati)
+	AuditeeRecKebijakan string `gorm:"type:text" json:"auditee_rec_kebijakan"`
+	AuditeeRecSistem    string `gorm:"type:text" json:"auditee_rec_sistem"`
+	AuditeeRecSDM       string `gorm:"type:text" json:"auditee_rec_sdm"`
+	AuditeeRecEksternal string `gorm:"type:text" json:"auditee_rec_eksternal"`
+
+	AuditeePIC   string     `json:"auditee_pic"` // nama PIC auditee penyelesaian
+	DeadlineDate *time.Time `json:"deadline_date"`
+
+	Status           string              `gorm:"default:'draft'" json:"status"`
+	CreatedByID      uuid.UUID           `gorm:"type:uuid;not null" json:"created_by_id"`
+	CreatedBy        User                `gorm:"foreignKey:CreatedByID" json:"created_by"`
+	SubmittedAt      *time.Time          `json:"submitted_at"`
+	ApprovalRequests []ApprovalRequest   `gorm:"polymorphic:Entity;polymorphicValue:finding" json:"approval_requests,omitempty"`
+	Attachments      []FindingAttachment `gorm:"foreignKey:FindingID" json:"attachments,omitempty"`
+}
+
+// --- Finding Attachment (Lampiran) ---
+
+type FindingAttachment struct {
+	Base
+	FindingID    uuid.UUID `gorm:"type:uuid;not null" json:"finding_id"`
+	Title        string    `gorm:"not null" json:"title"`
+	FileName     string    `gorm:"not null" json:"file_name"`
+	FilePath     string    `gorm:"default:''" json:"-"`
+	DriveFileID  string    `json:"-"`
+	DriveFileURL string    `json:"drive_file_url"`
+	FileSize     int64     `json:"file_size"`
+	ContentType  string    `json:"content_type"`
+	UploadedByID uuid.UUID `gorm:"type:uuid;not null" json:"uploaded_by_id"`
+	UploadedBy   User      `gorm:"foreignKey:UploadedByID" json:"uploaded_by"`
+}
+
 // --- AI Log ---
 
 type AILog struct {

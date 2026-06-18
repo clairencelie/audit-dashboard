@@ -14,6 +14,7 @@ import { DailyEffortTab } from './tabs/DailyEffortTab'
 import { WorkingPaperTab } from './tabs/WorkingPaperTab'
 import { DataRequestTab } from './tabs/DataRequestTab'
 import { ReferenceDocTab } from './tabs/ReferenceDocTab'
+import { FindingsTab } from './tabs/FindingsTab'
 import {
   ChevronLeft,
   Calendar,
@@ -25,9 +26,10 @@ import {
   Upload,
   Database,
   BookOpen,
+  AlertTriangle,
 } from 'lucide-react'
 
-type Tab = 'overview' | 'audit-program' | 'checklists' | 'daily-effort' | 'working-papers' | 'data-requests' | 'reference-docs'
+type Tab = 'overview' | 'audit-program' | 'checklists' | 'daily-effort' | 'working-papers' | 'data-requests' | 'reference-docs' | 'findings'
 
 export function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -91,6 +93,11 @@ export function ProjectDetailPage() {
       id: 'reference-docs',
       label: 'Dok. Referensi',
       icon: <BookOpen className="w-4 h-4" />,
+    },
+    {
+      id: 'findings',
+      label: 'Findings',
+      icon: <AlertTriangle className="w-4 h-4" />,
     },
   ]
 
@@ -194,6 +201,7 @@ export function ProjectDetailPage() {
         {activeTab === 'working-papers' && <WorkingPaperTab project={project} />}
         {activeTab === 'data-requests' && <DataRequestTab project={project} />}
         {activeTab === 'reference-docs' && <ReferenceDocTab project={project} />}
+        {activeTab === 'findings' && <FindingsTab project={project} />}
       </div>
     </div>
   )
